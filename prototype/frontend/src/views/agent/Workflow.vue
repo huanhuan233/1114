@@ -62,7 +62,7 @@
                 <el-icon v-else><Cpu /></el-icon>
               </div>
               <div class="node-title">{{ node.label }}</div>
-              <div class="node-meta">{{ node.modelName || '未配置' }}</div>
+              <div class="node-meta">{{ nodeMeta(node) }}</div>
               <button
                 class="node-handle right add"
                 type="button"
@@ -93,6 +93,7 @@
           <div class="node-picker-tabs">
             <button class="np-tab" :class="{ active: nodePickerTab === 'node' }" @click="nodePickerTab = 'node'">节点</button>
             <button class="np-tab" :class="{ active: nodePickerTab === 'tool' }" @click="nodePickerTab = 'tool'">工具</button>
+            <button class="np-tab" :class="{ active: nodePickerTab === 'app' }" @click="nodePickerTab = 'app'">APP</button>
             <button class="np-close" title="关闭" @click="nodePickerVisible = false">×</button>
           </div>
           <div class="node-picker-search">
@@ -168,6 +169,19 @@
                       <span class="bn-label">ELSE</span>
                       <el-button size="small" text type="primary" @click="openNodePicker(selectedNode.id, $event)">+ 选择下一个节点</el-button>
                     </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 其它节点：通用配置 -->
+              <template v-else-if="selectedNode.nodeType === 'app'">
+                <div class="config-block">
+                  <div class="block-label">APP</div>
+                  <p class="block-desc">该节点封装了一个前端 APP 页面，可作为工作流中的一步。</p>
+                  <div class="block-label" style="margin-top: 12px">页面路径</div>
+                  <el-input :model-value="selectedNode.appPath || ''" size="small" readonly />
+                  <div style="margin-top: 12px">
+                    <el-button size="small" type="primary" @click="openAppPage(selectedNode.appPath)">打开页面</el-button>
                   </div>
                 </div>
               </template>
@@ -300,6 +314,7 @@ interface WorkflowNode {
   knowledgeIds: string[]
   knowledgeNames?: string[]
   desc: string
+  appPath?: string
   x: number
   y: number
   branch?: {
@@ -327,7 +342,7 @@ const appInfoVisible = ref(false)
 const savingAppInfo = ref(false)
 const appInfoForm = ref({ name: '', desc: '', type: 'chatflow' })
 
-type PickerTab = 'node' | 'tool'
+type PickerTab = 'node' | 'tool' | 'app'
 interface PickerItem {
   key: string
   label: string
@@ -335,6 +350,7 @@ interface PickerItem {
   group: string
   badge: string
   desc?: string
+  payload?: { path?: string }
 }
 
 const defaultNodes: WorkflowNode[] = [
@@ -367,6 +383,20 @@ const nodePickerItems = ref<PickerItem[]>([
 ])
 
 const toolPickerItems = ref<PickerItem[]>([])
+
+// APP：把左侧菜单的三级页面封装成节点（按二级菜单分组）
+const appPickerItems = ref<PickerItem[]>([
+  // 二级：特种工艺决策与指令生成软件（/integration/capp/*）
+  { key: 'app-special', label: '特种工艺决策与指令生成APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/special', payload: { path: '/integration/capp/special' } },
+  { key: 'app-laying', label: '复材铺放工艺决策APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/laying', payload: { path: '/integration/capp/laying' } },
+  { key: 'app-filament', label: '复材铺丝工艺编程APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/filament', payload: { path: '/integration/capp/filament' } },
+  { key: 'app-conduit', label: '导管成形工艺仿真APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/conduit', payload: { path: '/integration/capp/conduit' } },
+  { key: 'app-superplastic', label: '超塑成形工艺仿真APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/superplastic', payload: { path: '/integration/capp/superplastic' } },
+
+  // 二级：复材成型工艺高精度仿真软件（/integration/cae/*）
+  { key: 'app-cae-process', label: '复材制造工艺过程仿真APP', kind: 'app', group: '复材成型工艺高精度仿真软件', badge: 'APP', desc: '/integration/cae/process', payload: { path: '/integration/cae/process' } },
+  { key: 'app-cae-solver', label: '渗流求解器与多物理耦合器APP', kind: 'app', group: '复材成型工艺高精度仿真软件', badge: 'APP', desc: '/integration/cae/solver', payload: { path: '/integration/cae/solver' } },
+])
 
 async function refreshToolPickerItems() {
   try {
@@ -600,7 +630,7 @@ function openNodePicker(sourceId: string | null, e?: MouseEvent) {
 const filteredPickerGroups = computed(() => {
   const tab = nodePickerTab.value
   const kw = nodePickerSearch.value.trim().toLowerCase()
-  let list = tab === 'node' ? nodePickerItems.value : toolPickerItems.value
+  let list = tab === 'node' ? nodePickerItems.value : tab === 'tool' ? toolPickerItems.value : appPickerItems.value
   if (kw) list = list.filter(i => i.label.toLowerCase().includes(kw) || (i.desc && i.desc.toLowerCase().includes(kw)))
   const groups = new Map<string, PickerItem[]>()
   for (const it of list) {
@@ -622,12 +652,15 @@ function pickNode(item: PickerItem) {
   const newNode: WorkflowNode = {
     id,
     label: item.label,
-    nodeType: item.kind === 'node' ? item.key : 'tool',
+    nodeType: item.kind === 'node' ? item.key : item.kind === 'tool' ? 'tool' : 'app',
     modelId: '',
     knowledgeIds: [],
     desc: '',
     x: baseX + 200,
     y: baseY,
+  }
+  if (newNode.nodeType === 'app') {
+    newNode.appPath = item.payload?.path || ''
   }
   if (newNode.nodeType === 'branch') {
     newNode.branch = { ifRules: [] }
@@ -642,6 +675,16 @@ function pickNode(item: PickerItem) {
   selectedNodeId.value = id
   nodePickerVisible.value = false
   scheduleSaveWorkflow()
+}
+
+function nodeMeta(n: WorkflowNode) {
+  if (n.nodeType === 'app') return n.appPath || 'APP'
+  return n.modelName || '未配置'
+}
+
+function openAppPage(path?: string) {
+  if (!path) return
+  router.push(path)
 }
 
 // 条件分支：规则选择

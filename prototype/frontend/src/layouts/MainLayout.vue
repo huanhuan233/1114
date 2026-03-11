@@ -146,9 +146,26 @@
         </div>
       </el-header>
       <el-main class="main">
-        <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route: currentRoute }">
           <transition name="fade" mode="out-in">
-            <component :is="Component" />
+            <Suspense v-if="Component">
+              <component :is="Component" :key="currentRoute.path" />
+              <template #fallback>
+                <div class="main-loading">
+                  <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+                  <p>加载中…</p>
+                </div>
+              </template>
+            </Suspense>
+            <div v-else class="main-empty">
+              <el-icon :size="48"><WarningFilled /></el-icon>
+              <p>页面加载失败或不存在</p>
+              <p class="main-empty-hint">刷新后一般可恢复</p>
+              <div class="main-empty-actions">
+                <el-button type="primary" @click="goHome">返回首页</el-button>
+                <el-button @click="reloadPage">刷新页面</el-button>
+              </div>
+            </div>
           </transition>
         </router-view>
       </el-main>
@@ -158,11 +175,18 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { Fold, Expand } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Fold, Expand, Loading, WarningFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const collapsed = ref(false)
+function goHome() {
+  router.push('/home')
+}
+function reloadPage() {
+  window.location.reload()
+}
 const activeMenu = computed(() => route.path)
 const defaultOpeneds = computed(() => {
   const opens: string[] = []
@@ -293,6 +317,33 @@ const asideWidth = computed(() => (collapsed.value ? '64px' : '220px'))
 .aside :deep(.el-menu)::-webkit-scrollbar-thumb:hover,
 .aside::-webkit-scrollbar-thumb:hover {
   background: #718096;
+}
+.main-loading,
+.main-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  color: #909399;
+  gap: 12px;
+}
+.main-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+.main-empty-hint {
+  font-size: 12px !important;
+  color: #c0c4cc;
+}
+.main-empty-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+.main-loading p {
+  margin: 0;
+  font-size: 14px;
 }
 .fade-enter-active,
 .fade-leave-active {
