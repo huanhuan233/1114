@@ -181,7 +181,7 @@
                   <div class="block-label" style="margin-top: 12px">页面路径</div>
                   <el-input :model-value="selectedNode.appPath || ''" size="small" readonly />
                   <div style="margin-top: 12px">
-                    <el-button size="small" type="primary" @click="openAppPage(selectedNode.appPath)">打开页面</el-button>
+                    <el-button size="small" type="primary" @click="openAppPageNewTab(selectedNode.appPath)">打开页面</el-button>
                   </div>
                 </div>
               </template>
@@ -324,6 +324,8 @@ interface WorkflowNode {
 
 const canvasRef = ref<HTMLElement | null>(null)
 const canvasWrapRef = ref<HTMLElement | null>(null)
+// 仅用于模板 ref 绑定，避免 TS 未使用提示
+void canvasRef
 const saveTime = ref('未保存')
 const configTab = ref('settings')
 const zoom = ref(1)
@@ -682,9 +684,10 @@ function nodeMeta(n: WorkflowNode) {
   return n.modelName || '未配置'
 }
 
-function openAppPage(path?: string) {
+function openAppPageNewTab(path?: string) {
   if (!path) return
-  router.push(path)
+  const href = router.resolve(path).href
+  window.open(href, '_blank')
 }
 
 // 条件分支：规则选择
@@ -738,7 +741,7 @@ function selectRule(rule: ruleApi.RuleItem) {
   scheduleSaveWorkflow()
 }
 
-function removeBranchRule(target: 'if', ruleId: string) {
+function removeBranchRule(_target: 'if', ruleId: string) {
   const n = selectedNode.value
   if (!n || n.nodeType !== 'branch' || !n.branch) return
   n.branch.ifRules = n.branch.ifRules.filter(x => x.ruleId !== ruleId)
@@ -749,12 +752,21 @@ function startDrag(id: string, e: MouseEvent) {
   const node = nodes.value.find(n => n.id === id)
   if (!node) return
   draggingId.value = id
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  dragOffset.value = { x: e.clientX - node.x, y: e.clientY - node.y }
+  const wrap = canvasWrapRef.value
+  const getPoint = (ev: MouseEvent) => {
+    if (!wrap) return { x: ev.clientX / zoom.value, y: ev.clientY / zoom.value }
+    const rect = wrap.getBoundingClientRect()
+    const x = (ev.clientX - rect.left + wrap.scrollLeft) / zoom.value
+    const y = (ev.clientY - rect.top + wrap.scrollTop) / zoom.value
+    return { x, y }
+  }
+  const p0 = getPoint(e)
+  dragOffset.value = { x: p0.x - node.x, y: p0.y - node.y }
   const onMove = (ev: MouseEvent) => {
     if (draggingId.value !== id) return
-    node.x = Math.max(0, ev.clientX - dragOffset.value.x)
-    node.y = Math.max(0, ev.clientY - dragOffset.value.y)
+    const p = getPoint(ev)
+    node.x = Math.max(0, p.x - dragOffset.value.x)
+    node.y = Math.max(0, p.y - dragOffset.value.y)
   }
   const onUp = () => {
     draggingId.value = null
