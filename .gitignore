@@ -1,0 +1,52 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Java / Maven / Spring Boot
+target/
+*.jar
+*.war
+*.class
+*.log
+.gradle/
+!gradle-wrapper.jar
+
+# Node / npm / Vite / Vue
+node_modules/
+dist/
+*.local
+.npm
+.pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs
+logs/
+*.log
+prototype/logs/
+
+# Build & temp
+*.zip
+*.tar.gz
+out/
+tmp/
+temp/
+.cache/
+
+# H2 / DB runtime (optional, uncomment if you don't want to track)
+# *.db
+# *.trace.db
