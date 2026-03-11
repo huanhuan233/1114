@@ -42,11 +42,3 @@ cd /data/PXY/cappall
 ./setup-and-start.sh
 ```
 
-## 3. 不使用数据库（仅 H2 内存）
-
-若暂时不装 MariaDB/MySQL，可用 H2 直接跑（数据不持久化）：
-```bash
-cd /data/PXY/cappall/prototype
-./start-h2.sh
-```
-访问：http://192.168.0.97:5355/
