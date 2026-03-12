@@ -135,7 +135,7 @@
         <span v-show="!collapsed">收起</span>
       </div>
     </el-aside>
-    <el-container>
+    <el-container class="main-body">
       <el-header class="header">
         <span class="page-title title-ellipsis" :title="pageTitle">{{ pageTitle }}</span>
         <div class="header-right">
@@ -154,41 +154,71 @@
         </div>
       </el-header>
       <el-main class="main">
-        <router-view v-slot="{ Component, route: currentRoute }">
-          <transition name="fade" mode="out-in">
-            <Suspense v-if="Component">
-              <component :is="Component" :key="currentRoute.path" />
-              <template #fallback>
-                <div class="main-loading">
-                  <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-                  <p>加载中…</p>
+        <div class="main-inner">
+          <router-view v-slot="{ Component, route: currentRoute }">
+            <transition name="fade" mode="out-in">
+              <div v-if="childError" key="error" class="main-empty">
+                <el-icon :size="48"><WarningFilled /></el-icon>
+                <p>页面加载失败或不存在</p>
+                <p class="main-empty-hint">刷新后一般可恢复</p>
+                <div class="main-empty-actions">
+                  <el-button type="primary" @click="goHome">返回首页</el-button>
+                  <el-button @click="reloadPage">刷新页面</el-button>
                 </div>
-              </template>
-            </Suspense>
-            <div v-else class="main-empty">
-              <el-icon :size="48"><WarningFilled /></el-icon>
-              <p>页面加载失败或不存在</p>
-              <p class="main-empty-hint">刷新后一般可恢复</p>
-              <div class="main-empty-actions">
-                <el-button type="primary" @click="goHome">返回首页</el-button>
-                <el-button @click="reloadPage">刷新页面</el-button>
               </div>
-            </div>
-          </transition>
-        </router-view>
+              <div v-else-if="Component" :key="layoutLevelKey(currentRoute)" class="main-content-wrap">
+                <Suspense>
+                  <component :is="Component" />
+                  <template #fallback>
+                    <div class="main-loading">
+                      <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+                      <p>加载中…</p>
+                    </div>
+                  </template>
+                </Suspense>
+              </div>
+              <div v-else key="empty" class="main-empty">
+                <el-icon :size="48"><WarningFilled /></el-icon>
+                <p>页面加载失败或不存在</p>
+                <p class="main-empty-hint">刷新后一般可恢复</p>
+                <div class="main-empty-actions">
+                  <el-button type="primary" @click="goHome">返回首页</el-button>
+                  <el-button @click="reloadPage">刷新页面</el-button>
+                </div>
+              </div>
+            </transition>
+          </router-view>
+        </div>
       </el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { Fold, Expand, Loading, WarningFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
+const childError = ref(false)
+
+watch(() => route.path, () => { childError.value = false }, { immediate: true })
+
+/** 用“布局级”路径做 key，避免在仅切换子路由时销毁整块布局导致空白 */
+function layoutLevelKey(r: RouteLocationNormalizedLoaded): string {
+  const top = r.matched[1]
+  return top ? (top.path || r.path) : r.path
+}
+
+onErrorCaptured((err: unknown) => {
+  childError.value = true
+  console.error('[MainLayout] 子组件渲染错误', err)
+  return false
+})
+
 function goHome() {
   router.push('/home')
 }
@@ -213,6 +243,29 @@ const asideWidth = computed(() => (collapsed.value ? '64px' : '220px'))
 <style scoped>
 .main-layout {
   height: 100vh;
+  display: flex;
+  flex-direction: row;
+}
+.main-layout > .el-container.main-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-body > .el-main.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+.main-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 .aside {
   background: #1a2332;
@@ -305,8 +358,25 @@ const asideWidth = computed(() => (collapsed.value ? '64px' : '220px'))
 }
 .main {
   background: #f0f2f5;
-  padding: 20px;
   overflow: auto;
+}
+.main-inner > :deep(*) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-content-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-content-wrap > :deep(*) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 /* 左侧菜单栏滚动条深色 */
 .aside :deep(.el-menu)::-webkit-scrollbar,

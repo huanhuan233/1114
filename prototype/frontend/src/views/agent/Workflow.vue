@@ -711,7 +711,7 @@ async function publish() {
       }
     }
     ElMessage.success('已发布')
-    router.push('/integration')
+    await router.replace({ path: '/integration' })
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '发布失败')
   } finally {
@@ -1004,8 +1004,9 @@ function startDrag(id: string, e: MouseEvent) {
 .dify-workflow {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   height: 100%;
-  min-height: 520px;
   background: #f9fafb;
 }
 .workflow-header {
@@ -1232,10 +1233,12 @@ function startDrag(id: string, e: MouseEvent) {
 .workflow-config {
   width: 320px;
   flex-shrink: 0;
+  flex: 0 0 320px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1423,8 +1426,18 @@ function startDrag(id: string, e: MouseEvent) {
 }
 .config-tabs {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.config-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: auto;
+}
+.config-tabs :deep(.el-tab-pane) {
+  height: 100%;
 }
 .config-tabs :deep(.el-tabs__header) {
   margin-bottom: 12px;
