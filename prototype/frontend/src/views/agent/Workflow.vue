@@ -1246,7 +1246,7 @@ function startDrag(id: string, e: MouseEvent) {
 .node-picker {
   position: absolute;
   width: 320px;
-  max-height: calc(100% - 32px);
+  max-height: min(420px, calc(100vh - 120px));
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -1301,6 +1301,10 @@ function startDrag(id: string, e: MouseEvent) {
   padding: 8px 10px 10px;
   flex: 1;
   min-height: 0;
+  overflow: auto;
+}
+.node-picker-list :deep(.el-scrollbar__wrap) {
+  overflow-x: hidden;
 }
 .np-group-title {
   margin: 10px 0 6px;
