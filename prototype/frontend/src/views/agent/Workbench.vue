@@ -77,6 +77,9 @@
               <el-icon><CollectionTag /></el-icon>
               添加标签
             </el-button>
+            <el-button link size="small" type="danger" @click.stop="handleDeleteApp(app)">
+              删除
+            </el-button>
           </div>
         </div>
       </section>
@@ -117,7 +120,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, DocumentAdd, FolderOpened, Upload, MagicStick, CollectionTag } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as appApi from '@/api/apps'
 
 const router = useRouter()
@@ -198,6 +201,23 @@ function typeLabel(type: string) {
 
 function addTag(app: appApi.AppItem) {
   ElMessage.info(`为「${app.name}」添加标签（后续实现）`)
+}
+
+async function handleDeleteApp(app: appApi.AppItem) {
+  try {
+    await ElMessageBox.confirm(`确定删除应用「${app.name}」？删除后不可恢复。`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await appApi.deleteApp(app.id)
+    ElMessage.success('已删除')
+    fetchApps()
+  } catch (e) {
+    if ((e as Error)?.message !== 'cancel') {
+      ElMessage.error(e instanceof Error ? e.message : '删除失败')
+    }
+  }
 }
 
 async function submitCreate() {
@@ -403,6 +423,9 @@ onMounted(() => {
   margin-top: auto;
   padding-top: 8px;
   border-top: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .workbench-footer {
   padding: 16px;

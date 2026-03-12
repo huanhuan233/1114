@@ -66,11 +66,11 @@ public final class TaskWorkflowTemplateFactory {
     }
 
     /**
-     * 按模板 key 拼装节点链，使用 TaskNodeRegistry 中的 key。
-     * 导管成形: start -> agent -> app-conduit -> app-feasibility -> app-special
-     * 复材成型: start -> agent -> app-laying -> app-cae-process -> app-cae-solver
-     * 复材切边: start -> agent -> app-filament -> app-feasibility
-     * 超塑成形: start -> agent -> app-superplastic -> app-special
+     * 按模板 key 拼装节点链，使用 TaskNodeRegistry 中的 key。每条链均以 start 开头、end 结尾，约 10–12 个节点。
+     * 导管成形: start -> agent -> app-conduit -> app-feasibility -> app-special -> app-structure -> llm -> human -> report -> end
+     * 复材成型: start -> agent -> app-laying -> app-cae-process -> app-cae-solver -> app-feasibility -> llm -> human -> report -> end
+     * 复材切边: start -> agent -> app-filament -> app-feasibility -> app-special -> app-structure -> llm -> human -> report -> end
+     * 超塑成形: start -> agent -> app-superplastic -> app-special -> app-feasibility -> app-structure -> llm -> human -> report -> end
      * default: 同导管成形
      */
     private static String buildTemplateWorkflowJson(String templateKey, String taskType) {
@@ -108,22 +108,32 @@ public final class TaskWorkflowTemplateFactory {
     private static List<String> nodeKeysForTemplate(String templateKey) {
         if (TEMPLATE_CONDUIT_PROCESS.equals(templateKey) || TEMPLATE_DEFAULT.equals(templateKey)) {
             return List.of(TaskNodeRegistry.KEY_START, TaskNodeRegistry.KEY_AGENT,
-                    TaskNodeRegistry.KEY_APP_CONDUIT, TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_APP_SPECIAL);
+                    TaskNodeRegistry.KEY_APP_CONDUIT, TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_APP_SPECIAL,
+                    TaskNodeRegistry.KEY_APP_STRUCTURE, TaskNodeRegistry.KEY_LLM, TaskNodeRegistry.KEY_HUMAN,
+                    TaskNodeRegistry.KEY_REPORT, TaskNodeRegistry.KEY_END);
         }
         if (TEMPLATE_COMPOSITE_FORMING.equals(templateKey)) {
             return List.of(TaskNodeRegistry.KEY_START, TaskNodeRegistry.KEY_AGENT,
-                    TaskNodeRegistry.KEY_APP_LAYING, TaskNodeRegistry.KEY_APP_CAE_PROCESS, TaskNodeRegistry.KEY_APP_CAE_SOLVER);
+                    TaskNodeRegistry.KEY_APP_LAYING, TaskNodeRegistry.KEY_APP_CAE_PROCESS, TaskNodeRegistry.KEY_APP_CAE_SOLVER,
+                    TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_LLM, TaskNodeRegistry.KEY_HUMAN,
+                    TaskNodeRegistry.KEY_REPORT, TaskNodeRegistry.KEY_END);
         }
         if (TEMPLATE_COMPOSITE_TRIMMING.equals(templateKey)) {
             return List.of(TaskNodeRegistry.KEY_START, TaskNodeRegistry.KEY_AGENT,
-                    TaskNodeRegistry.KEY_APP_FILAMENT, TaskNodeRegistry.KEY_APP_FEASIBILITY);
+                    TaskNodeRegistry.KEY_APP_FILAMENT, TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_APP_SPECIAL,
+                    TaskNodeRegistry.KEY_APP_STRUCTURE, TaskNodeRegistry.KEY_LLM, TaskNodeRegistry.KEY_HUMAN,
+                    TaskNodeRegistry.KEY_REPORT, TaskNodeRegistry.KEY_END);
         }
         if (TEMPLATE_SUPERPLASTIC_FORMING.equals(templateKey)) {
             return List.of(TaskNodeRegistry.KEY_START, TaskNodeRegistry.KEY_AGENT,
-                    TaskNodeRegistry.KEY_APP_SUPERPLASTIC, TaskNodeRegistry.KEY_APP_SPECIAL);
+                    TaskNodeRegistry.KEY_APP_SUPERPLASTIC, TaskNodeRegistry.KEY_APP_SPECIAL, TaskNodeRegistry.KEY_APP_FEASIBILITY,
+                    TaskNodeRegistry.KEY_APP_STRUCTURE, TaskNodeRegistry.KEY_LLM, TaskNodeRegistry.KEY_HUMAN,
+                    TaskNodeRegistry.KEY_REPORT, TaskNodeRegistry.KEY_END);
         }
         return List.of(TaskNodeRegistry.KEY_START, TaskNodeRegistry.KEY_AGENT,
-                TaskNodeRegistry.KEY_APP_CONDUIT, TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_APP_SPECIAL);
+                TaskNodeRegistry.KEY_APP_CONDUIT, TaskNodeRegistry.KEY_APP_FEASIBILITY, TaskNodeRegistry.KEY_APP_SPECIAL,
+                TaskNodeRegistry.KEY_APP_STRUCTURE, TaskNodeRegistry.KEY_LLM, TaskNodeRegistry.KEY_HUMAN,
+                TaskNodeRegistry.KEY_REPORT, TaskNodeRegistry.KEY_END);
     }
 
     /**

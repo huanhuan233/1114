@@ -68,6 +68,7 @@
               <button class="node-handle left" type="button" title="连接" />
               <div class="node-icon">
                 <el-icon v-if="node.nodeType === 'start'"><Right /></el-icon>
+                <el-icon v-else-if="node.nodeType === 'end'"><CircleCheck /></el-icon>
                 <el-icon v-else-if="node.nodeType === 'app'"><Document /></el-icon>
                 <el-icon v-else><Cpu /></el-icon>
               </div>
@@ -364,7 +365,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Plus, Rank, Refresh, Grid, Collection, MoreFilled, Right, Cpu, Close, QuestionFilled, RefreshLeft, RefreshRight, Document } from '@element-plus/icons-vue'
+import { Plus, Rank, Refresh, Grid, Collection, MoreFilled, Right, Cpu, Close, QuestionFilled, RefreshLeft, RefreshRight, Document, CircleCheck } from '@element-plus/icons-vue'
 import * as modelApi from '@/api/models'
 import * as knowledgeApi from '@/api/knowledge'
 import * as toolApi from '@/api/tools'
@@ -871,6 +872,7 @@ function pickNode(item: PickerItem) {
 function nodeMeta(n: WorkflowNode) {
   if (n.nodeType === 'app') return n.appPath || n.group || 'APP'
   if (n.nodeType === 'start') return '起始'
+  if (n.nodeType === 'end') return '结束'
   return n.modelName || '未配置'
 }
 
