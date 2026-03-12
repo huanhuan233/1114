@@ -38,6 +38,7 @@
       <aside class="create-panel">
         <div class="create-card">
           <h3 class="create-title">创建应用</h3>
+          <p class="create-hint">新建任务并自动生成工作流请前往「任务管理」</p>
           <div class="create-options">
             <div class="create-option" @click="createBlank">
               <span class="option-icon"><el-icon><DocumentAdd /></el-icon></span>
@@ -298,10 +299,15 @@ onMounted(() => {
   border: 1px solid #e5e7eb;
 }
 .create-title {
-  margin: 0 0 20px;
+  margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
   color: #111827;
+}
+.create-hint {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #6b7280;
 }
 .create-options {
   display: flex;

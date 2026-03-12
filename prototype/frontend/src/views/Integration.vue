@@ -7,33 +7,7 @@
           <el-button type="primary" :icon="Plus" @click="openDialog()">新建总任务</el-button>
         </div>
       </template>
-      <p class="card-desc">按零件类型创建总任务，系统将根据所选零件自动匹配工作流（工艺审查、CAPP、CAM、CAE、结构设计等）。</p>
-      <el-row :gutter="16" class="workflow-ref">
-        <el-col :span="6">
-          <div class="part-type-card">
-            <div class="part-name">复材成型</div>
-            <div class="part-flow">工艺审查 → CAPP → CAM → CAE</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="part-type-card">
-            <div class="part-name">复材切边</div>
-            <div class="part-flow">工艺审查 → CAPP → CAM</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="part-type-card">
-            <div class="part-name">导管成形</div>
-            <div class="part-flow">工艺审查 → CAPP → CAM → CAE</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="part-type-card">
-            <div class="part-name">超塑成形</div>
-            <div class="part-flow">结构设计 → CAPP → CAE</div>
-          </div>
-        </el-col>
-      </el-row>
+      <p class="card-desc">按任务类型创建总任务，系统将根据所选类型自动编排工作流节点（当前为 Mock 模板，后续接入智能体后由引擎生成）。</p>
     </el-card>
     <el-card shadow="never" class="task-list">
       <template #header>
@@ -70,11 +44,6 @@
         <el-table-column prop="system" label="零件类型" width="100">
           <template #default="{ row }">
             <el-tag :type="partTagType(row.system)" size="small">{{ row.system }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="工作流" min-width="260">
-          <template #default="{ row }">
-            <span class="workflow-text">{{ getWorkflowLabel(row.system) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="对应工作流" min-width="140">
@@ -121,8 +90,8 @@
             <el-option label="超塑成形" value="超塑成形" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="dialogForm.partType" label="工作流">
-          <div class="workflow-preview">{{ getWorkflowLabel(dialogForm.partType) }}</div>
+        <el-form-item v-if="dialogForm.partType" label="说明">
+          <div class="workflow-preview">将根据所选类型自动编排 Mock 节点，创建后进入工作流页查看</div>
         </el-form-item>
         <el-divider content-position="left">任务输入</el-divider>
         <el-row :gutter="20">
@@ -207,6 +176,7 @@ import * as integrationApi from '@/api/integration'
 
 const router = useRouter()
 
+/** 任务类型对应的 Mock 节点模板由后端按 system 生成，此处仅作展开步骤展示用 */
 const PART_WORKFLOWS: Record<string, string> = {
   '复材成型': '工艺审查 → CAPP → CAM → CAE',
   '复材切边': '工艺审查 → CAPP → CAM',
@@ -232,11 +202,7 @@ const dialogForm = reactive({
   modelFiles: [] as UploadFile[],
 })
 
-function getWorkflowLabel(partType: string) {
-  return PART_WORKFLOWS[partType] || '-'
-}
-
-/** 根据零件类型解析工作流，得到工作步骤列表（二级） */
+/** 根据零件类型解析工作步骤列表（展开行用，实际节点由后端 Mock 模板 JSON 编排） */
 function getWorkSteps(partType: string): { name: string; status?: string; progress?: number }[] {
   const flow = PART_WORKFLOWS[partType] || '-'
   if (flow === '-') return []
@@ -244,10 +210,10 @@ function getWorkSteps(partType: string): { name: string; status?: string; progre
   return names.map((name) => ({ name, status: '待执行', progress: Math.floor(Math.random() * 101) }))
 }
 
-/** 进入工作流页面（仅当有 appId 时可用） */
+/** 进入工作流页面（仅当有 appId 时可用），带上 taskId 与 fromTask 以便发布后返回任务管理 */
 function goWorkflow(row: IntegrationTask) {
   if (row.appId != null && row.appId !== '') {
-    router.push(`/agent-config/workflow?appId=${row.appId}`)
+    router.push(`/agent-config/workflow?appId=${row.appId}&fromTask=1&taskId=${row.id}`)
   } else {
     ElMessage.warning('该任务尚未生成工作流')
   }
@@ -256,7 +222,7 @@ function goWorkflow(row: IntegrationTask) {
 /** 详情：若有工作流则进入工作流页，否则提示 */
 function goDetail(row: IntegrationTask) {
   if (row.appId != null && row.appId !== '') {
-    router.push(`/agent-config/workflow?appId=${row.appId}`)
+    router.push(`/agent-config/workflow?appId=${row.appId}&fromTask=1&taskId=${row.id}`)
   } else {
     ElMessage.warning('该任务尚未生成工作流')
   }
@@ -288,6 +254,8 @@ function partTagType(partType: string) {
 function statusTagType(s: string) {
   if (s === '已完成') return 'success'
   if (s === '进行中') return 'primary'
+  if (s === '排队中' || s === '已发布') return 'primary'
+  if (s === '待配置' || s === '草稿') return 'warning'
   return 'info'
 }
 
@@ -357,11 +325,17 @@ async function submitTask() {
       status: '排队中',
       progress: 0,
     })
-    ElMessage.success('任务已创建，并已自动生成对应工作流')
+    const data = res?.data as Record<string, unknown> | undefined
+    const appId = data?.appId
+    const taskId = (data?.taskId != null ? String(data.taskId) : data?.id != null ? String(data.id) : '') || ''
+    ElMessage.success('任务已创建，正在跳转到工作流配置…')
     dialogVisible.value = false
-    fetchTasks()
-    if (res.data?.appId != null && res.data.appId !== '') {
-      router.push(`/agent-config/workflow?appId=${res.data.appId}`)
+    await fetchTasks()
+    const hasAppId = appId != null && appId !== undefined && String(appId).trim() !== ''
+    if (hasAppId) {
+      router.push(`/agent-config/workflow?appId=${appId}&fromTask=1&taskId=${taskId}`)
+    } else {
+      ElMessage.warning('任务已创建，但未返回工作流 ID，请到任务列表中点击「进入工作流」')
     }
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '创建失败')
@@ -387,32 +361,10 @@ onMounted(() => fetchTasks())
 .create-master-card {
   margin-bottom: 20px;
 }
-.workflow-ref {
-  margin-top: 8px;
-}
-.part-type-card {
-  padding: 12px;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  background: #fafafa;
-}
-.part-name {
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 6px;
-}
-.part-flow {
-  font-size: 12px;
-  color: #606266;
-}
 .workflow-preview {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
-  color: #606266;
-}
-.workflow-text {
   font-size: 13px;
   color: #606266;
 }

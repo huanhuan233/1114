@@ -88,7 +88,8 @@ public class IntegrationController {
         IntegrationTask e = new IntegrationTask();
         e.setName(name);
         e.setSystem((String) body.get("system"));
-        e.setStatus(body.get("status") != null ? body.get("status").toString() : "排队中");
+        // 新建任务未发布工作流前为「待配置」，发布后由前端更新为「排队中」
+        e.setStatus(body.get("status") != null ? body.get("status").toString() : "待配置");
         e.setProgress(body.get("progress") != null ? ((Number) body.get("progress")).intValue() : 0);
         e.setCreateTime(now);
         if (body.get("startTime") != null && !body.get("startTime").toString().isBlank())
@@ -104,7 +105,12 @@ public class IntegrationController {
         e.setWorkflowJsonSnapshot(workflowJson);
 
         e = repository.save(e);
-        return ApiResponse.ok(toMap(e));
+        Map<String, Object> response = toMap(e);
+        response.put("appId", app.getId());
+        response.put("appName", app.getName() != null ? app.getName() : "");
+        response.put("taskId", e.getId());
+        response.put("taskName", e.getName() != null ? e.getName() : "");
+        return ApiResponse.ok(response);
     }
 
     @PutMapping("/tasks/{id}")

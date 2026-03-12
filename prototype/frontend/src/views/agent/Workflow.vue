@@ -17,8 +17,12 @@
       </div>
     </header>
 
-    <!-- 任务自动生成工作流时的轻量提示 -->
-    <div v-if="workflowMeta?.source === 'task-auto-generated'" class="workflow-task-hint">
+    <!-- 从任务管理进入时的轻量提示：请检查节点后发布 -->
+    <div v-if="fromTask" class="workflow-task-hint">
+      该工作流由任务自动生成，请检查节点后发布
+    </div>
+    <!-- 兼容：非 fromTask 但 meta 标记为任务生成时仍显示提示 -->
+    <div v-else-if="workflowMeta?.source === 'task-auto-generated'" class="workflow-task-hint">
       该工作流由任务自动生成，当前为Mock推荐流，可继续编辑
     </div>
 
@@ -368,6 +372,7 @@ import * as ruleApi from '@/api/rules'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import * as appApi from '@/api/apps'
+import * as integrationApi from '@/api/integration'
 
 /** 节点扩展：与后端 TaskNodeRegistry / workflowJson 兼容，供配置面板与模拟运行使用 */
 interface MockRuntime {
@@ -419,6 +424,8 @@ const dragOffset = ref({ x: 0, y: 0 })
 const route = useRoute()
 const router = useRouter()
 const appId = computed(() => (route.query.appId ? String(route.query.appId) : ''))
+const taskId = computed(() => (route.query.taskId ? String(route.query.taskId) : ''))
+const fromTask = computed(() => route.query.fromTask === '1')
 const appName = ref('')
 const appType = ref('chatflow')
 const appStatus = ref<'草稿' | '已发布' | string>('草稿')
@@ -687,7 +694,7 @@ async function saveAppInfo() {
 
 async function publish() {
   if (!appId.value) {
-    ElMessage.warning('请先从工作台创建应用后再发布')
+    ElMessage.warning('请先创建应用后再发布')
     return
   }
   publishing.value = true
@@ -695,7 +702,15 @@ async function publish() {
     await saveWorkflowNow()
     const res = await appApi.publishApp(appId.value)
     appStatus.value = res.data.status
-    ElMessage.success('已发布，工作台可见')
+    if (taskId.value) {
+      try {
+        await integrationApi.updateIntegrationTask(taskId.value, { status: '排队中' })
+      } catch {
+        // 任务状态更新失败不影响发布结果
+      }
+    }
+    ElMessage.success('已发布')
+    router.push('/integration')
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '发布失败')
   } finally {
