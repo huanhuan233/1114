@@ -1,13 +1,19 @@
 package com.processagent.controller;
 
+import com.processagent.entity.AgentApp;
 import com.processagent.entity.IntegrationTask;
+import com.processagent.repository.AgentAppRepository;
 import com.processagent.repository.IntegrationTaskRepository;
+import com.processagent.service.TaskWorkflowTemplateFactory;
 import com.processagent.util.ApiResponse;
 import com.processagent.util.TimeFormat;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,7 +23,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class IntegrationController {
 
+    private static final Logger log = LoggerFactory.getLogger(IntegrationController.class);
+
     private final IntegrationTaskRepository repository;
+    private final AgentAppRepository agentAppRepository;
 
     @GetMapping("/tasks")
     public ApiResponse<List<Map<String, Object>>> list(
@@ -42,20 +51,58 @@ public class IntegrationController {
                 .orElse(ApiResponse.fail("未找到"));
     }
 
+    /**
+     * 创建总任务：保存任务并自动创建同名 AgentApp，写入非空 workflowJson，保证工作台可见、Workflow 有节点可展示。
+     */
     @PostMapping("/tasks")
     public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
+        String name = (String) body.get("name");
+        if (name == null || name.isBlank()) {
+            return ApiResponse.fail("任务名称不能为空");
+        }
+
+        String partTypeOrSystem = (String) body.get("partType");
+        if (partTypeOrSystem == null || partTypeOrSystem.isBlank()) {
+            partTypeOrSystem = (String) body.get("system");
+        }
+
+        String templateKey = TaskWorkflowTemplateFactory.resolveTemplateKey(partTypeOrSystem);
+        String workflowJson = TaskWorkflowTemplateFactory.getWorkflowJson(partTypeOrSystem);
+        if (workflowJson == null || workflowJson.isBlank()) {
+            workflowJson = TaskWorkflowTemplateFactory.getDefaultFallbackJson();
+            log.warn("workflowJson was empty, using default fallback for task name={}", name);
+        }
+        log.info("create task: name={}, templateKey={}, workflowJson length={}", name, templateKey, workflowJson.length());
+
+        Instant now = Instant.now();
+        AgentApp app = new AgentApp();
+        app.setName(name);
+        app.setAppType("workflow");
+        app.setStatus("草稿");
+        app.setWorkflowJson(workflowJson);
+        app.setCreateTime(now);
+        app.setUpdateTime(now);
+        app = agentAppRepository.save(app);
+        log.info("created AgentApp: id={}, name={}, workflowJson non-empty={}", app.getId(), app.getName(), app.getWorkflowJson() != null && !app.getWorkflowJson().isEmpty());
+
         IntegrationTask e = new IntegrationTask();
-        e.setName((String) body.get("name"));
+        e.setName(name);
         e.setSystem((String) body.get("system"));
         e.setStatus(body.get("status") != null ? body.get("status").toString() : "排队中");
         e.setProgress(body.get("progress") != null ? ((Number) body.get("progress")).intValue() : 0);
-        e.setCreateTime(Instant.now());
+        e.setCreateTime(now);
         if (body.get("startTime") != null && !body.get("startTime").toString().isBlank())
             e.setStartTime(Instant.parse(body.get("startTime").toString()));
         if (body.get("endTime") != null && !body.get("endTime").toString().isBlank())
             e.setEndTime(Instant.parse(body.get("endTime").toString()));
         if (body.get("runTimeSeconds") != null)
             e.setRunTimeSeconds(((Number) body.get("runTimeSeconds")).longValue());
+
+        e.setAppId(app.getId());
+        e.setAppName(app.getName());
+        e.setTemplateKey(templateKey);
+        e.setWorkflowJsonSnapshot(workflowJson);
+
         e = repository.save(e);
         return ApiResponse.ok(toMap(e));
     }
@@ -89,17 +136,21 @@ public class IntegrationController {
     }
 
     private Map<String, Object> toMap(IntegrationTask e) {
-        return Map.of(
-                "id", String.valueOf(e.getId()),
-                "name", nullToEmpty(e.getName()),
-                "system", nullToEmpty(e.getSystem()),
-                "status", nullToEmpty(e.getStatus()),
-                "progress", e.getProgress() != null ? e.getProgress() : 0,
-                "createTime", TimeFormat.format(e.getCreateTime()),
-                "startTime", e.getStartTime() != null ? TimeFormat.format(e.getStartTime()) : "",
-                "endTime", e.getEndTime() != null ? TimeFormat.format(e.getEndTime()) : "",
-                "runTimeSeconds", e.getRunTimeSeconds() != null ? e.getRunTimeSeconds() : 0L
-        );
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", String.valueOf(e.getId()));
+        m.put("name", nullToEmpty(e.getName()));
+        m.put("system", nullToEmpty(e.getSystem()));
+        m.put("status", nullToEmpty(e.getStatus()));
+        m.put("progress", e.getProgress() != null ? e.getProgress() : 0);
+        m.put("createTime", TimeFormat.format(e.getCreateTime()));
+        m.put("startTime", e.getStartTime() != null ? TimeFormat.format(e.getStartTime()) : "");
+        m.put("endTime", e.getEndTime() != null ? TimeFormat.format(e.getEndTime()) : "");
+        m.put("runTimeSeconds", e.getRunTimeSeconds() != null ? e.getRunTimeSeconds() : 0L);
+        m.put("appId", e.getAppId());
+        m.put("appName", nullToEmpty(e.getAppName()));
+        m.put("templateKey", nullToEmpty(e.getTemplateKey()));
+        m.put("workflowJsonSnapshot", e.getWorkflowJsonSnapshot() != null ? e.getWorkflowJsonSnapshot() : "");
+        return m;
     }
 
     private static String nullToEmpty(String s) {

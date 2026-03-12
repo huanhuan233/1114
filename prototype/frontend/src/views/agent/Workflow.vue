@@ -17,6 +17,11 @@
       </div>
     </header>
 
+    <!-- 任务自动生成工作流时的轻量提示 -->
+    <div v-if="workflowMeta?.source === 'task-auto-generated'" class="workflow-task-hint">
+      该工作流由任务自动生成，当前为Mock推荐流，可继续编辑
+    </div>
+
     <div class="workflow-body">
       <!-- 左侧：编排 / API / 日志 / 监测 + 画布工具栏 -->
       <aside class="workflow-sidebar">
@@ -58,7 +63,8 @@
             >
               <button class="node-handle left" type="button" title="连接" />
               <div class="node-icon">
-                <el-icon v-if="i === 0"><Right /></el-icon>
+                <el-icon v-if="node.nodeType === 'start'"><Right /></el-icon>
+                <el-icon v-else-if="node.nodeType === 'app'"><Document /></el-icon>
                 <el-icon v-else><Cpu /></el-icon>
               </div>
               <div class="node-title">{{ node.label }}</div>
@@ -173,7 +179,7 @@
                 </div>
               </template>
 
-              <!-- 其它节点：通用配置 -->
+              <!-- APP 节点：业务软件节点配置 -->
               <template v-else-if="selectedNode.nodeType === 'app'">
                 <div class="config-block">
                   <div class="block-label">APP</div>
@@ -184,10 +190,51 @@
                     <el-button size="small" type="primary" @click="openAppPageNewTab(selectedNode.appPath)">打开页面</el-button>
                   </div>
                 </div>
+                <div v-if="selectedNode.desc" class="config-block">
+                  <div class="block-label">说明</div>
+                  <p class="block-desc">{{ selectedNode.desc }}</p>
+                </div>
+                <div v-if="selectedNode.inputs?.length" class="config-block">
+                  <div class="block-label">输入</div>
+                  <p class="block-desc">{{ selectedNode.inputs.join('、') }}</p>
+                </div>
+                <div v-if="selectedNode.outputs?.length" class="config-block">
+                  <div class="block-label">输出</div>
+                  <p class="block-desc">{{ selectedNode.outputs.join('、') }}</p>
+                </div>
+                <div v-if="selectedNode.configSchema?.length" class="config-block">
+                  <div class="block-label">参数</div>
+                  <div v-for="sch in selectedNode.configSchema" :key="sch.field" class="config-schema-row">
+                    <template v-if="sch.type === 'select' && Array.isArray(sch.options)">
+                      <el-select :model-value="getNodeConfig(selectedNode, sch.field ?? '')" size="small" placeholder="请选择" style="width: 100%" @update:model-value="(v: string) => setNodeConfig(selectedNode!.id, sch.field ?? '', v)">
+                        <el-option v-for="opt in sch.options" :key="opt" :label="opt" :value="opt" />
+                      </el-select>
+                    </template>
+                    <el-input v-else :model-value="(getNodeConfig(selectedNode, sch.field ?? '') as string)" size="small" :placeholder="sch.label" @update:model-value="(v: string) => setNodeConfig(selectedNode!.id, sch.field ?? '', v)" />
+                  </div>
+                </div>
+                <div class="config-block">
+                  <div class="block-label">模拟运行</div>
+                  <p class="block-desc">状态：{{ selectedNode.mockRuntime?.status || 'idle' }}</p>
+                  <p v-if="selectedNode.mockRuntime?.mockResult" class="mock-result">{{ selectedNode.mockRuntime.mockResult }}</p>
+                  <el-button size="small" type="primary" :loading="mockRunningNodeId === selectedNode.id" style="margin-top: 8px" @click="selectedNode && runMockNode(selectedNode)">模拟运行</el-button>
+                </div>
               </template>
 
-              <!-- 其它节点：通用配置 -->
+              <!-- 其它节点：Agent/LLM 等通用配置 -->
               <template v-else>
+                <div v-if="selectedNode.desc" class="config-block">
+                  <div class="block-label">说明</div>
+                  <p class="block-desc">{{ selectedNode.desc }}</p>
+                </div>
+                <div v-if="selectedNode.inputs?.length" class="config-block">
+                  <div class="block-label">输入</div>
+                  <p class="block-desc">{{ selectedNode.inputs.join('、') }}</p>
+                </div>
+                <div v-if="selectedNode.outputs?.length" class="config-block">
+                  <div class="block-label">输出</div>
+                  <p class="block-desc">{{ selectedNode.outputs.join('、') }}</p>
+                </div>
                 <div class="config-block">
                   <div class="block-label">AGENT 策略 <el-icon class="help"><QuestionFilled /></el-icon></div>
                   <el-select v-model="selectedNode.modelId" placeholder="选择 Agent 策略 / 模型" style="width: 100%; margin-bottom: 12px" clearable>
@@ -211,6 +258,23 @@
                   >
                     <el-option v-for="k in knowledgeOptions" :key="k.id" :label="k.name" :value="k.id" />
                   </el-select>
+                </div>
+                <div v-if="selectedNode.configSchema?.length" class="config-block">
+                  <div class="block-label">参数</div>
+                  <div v-for="sch in selectedNode.configSchema" :key="sch.field" class="config-schema-row">
+                    <template v-if="sch.type === 'select' && Array.isArray(sch.options)">
+                      <el-select :model-value="getNodeConfig(selectedNode, sch.field ?? '')" size="small" placeholder="请选择" style="width: 100%" @update:model-value="(v: string) => setNodeConfig(selectedNode!.id, sch.field ?? '', v)">
+                        <el-option v-for="opt in sch.options" :key="opt" :label="opt" :value="opt" />
+                      </el-select>
+                    </template>
+                    <el-input v-else :model-value="(getNodeConfig(selectedNode, sch.field ?? '') as string)" size="small" :placeholder="sch.label" @update:model-value="(v: string) => setNodeConfig(selectedNode!.id, sch.field ?? '', v)" />
+                  </div>
+                </div>
+                <div class="config-block">
+                  <div class="block-label">模拟运行</div>
+                  <p class="block-desc">状态：{{ selectedNode.mockRuntime?.status || 'idle' }}</p>
+                  <p v-if="selectedNode.mockRuntime?.mockResult" class="mock-result">{{ selectedNode.mockRuntime.mockResult }}</p>
+                  <el-button size="small" type="primary" :loading="mockRunningNodeId === selectedNode.id" style="margin-top: 8px" @click="selectedNode && runMockNode(selectedNode)">模拟运行</el-button>
                 </div>
                 <div class="config-block">
                   <div class="block-label">输出变量</div>
@@ -296,7 +360,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Plus, Rank, Refresh, Grid, Collection, MoreFilled, Right, Cpu, Close, QuestionFilled, RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
+import { Plus, Rank, Refresh, Grid, Collection, MoreFilled, Right, Cpu, Close, QuestionFilled, RefreshLeft, RefreshRight, Document } from '@element-plus/icons-vue'
 import * as modelApi from '@/api/models'
 import * as knowledgeApi from '@/api/knowledge'
 import * as toolApi from '@/api/tools'
@@ -304,6 +368,19 @@ import * as ruleApi from '@/api/rules'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import * as appApi from '@/api/apps'
+
+/** 节点扩展：与后端 TaskNodeRegistry / workflowJson 兼容，供配置面板与模拟运行使用 */
+interface MockRuntime {
+  status?: string
+  lastRunTime?: string | null
+  mockResult?: string
+}
+interface ConfigSchemaItem {
+  field?: string
+  label?: string
+  type?: string
+  options?: string[]
+}
 
 interface WorkflowNode {
   id: string
@@ -320,6 +397,13 @@ interface WorkflowNode {
   branch?: {
     ifRules: { ruleId: string; ruleName: string }[]
   }
+  group?: string
+  inputs?: string[]
+  outputs?: string[]
+  configSchema?: ConfigSchemaItem[]
+  mockRuntime?: MockRuntime
+  mockResultTemplate?: string
+  config?: Record<string, unknown>
 }
 
 const canvasRef = ref<HTMLElement | null>(null)
@@ -339,6 +423,11 @@ const appName = ref('')
 const appType = ref('chatflow')
 const appStatus = ref<'草稿' | '已发布' | string>('草稿')
 const publishing = ref(false)
+
+/** 工作流元信息（如任务自动生成时的 source / templateKey / taskType） */
+const workflowMeta = ref<{ source?: string; templateKey?: string; taskType?: string } | null>(null)
+/** 边列表，与 nodes 一起从 workflowJson 解析，为后续画线交互保留 */
+const edges = ref<{ source: string; target: string }[]>([])
 
 const appInfoVisible = ref(false)
 const savingAppInfo = ref(false)
@@ -388,6 +477,10 @@ const toolPickerItems = ref<PickerItem[]>([])
 
 // APP：把左侧菜单的三级页面封装成节点（按二级菜单分组）
 const appPickerItems = ref<PickerItem[]>([
+  // 二级：可制造性分析与优化软件（/integration/process-review/*）
+  { key: 'app-structure', label: '结构合理性分析APP', kind: 'app', group: '可制造性分析与优化软件', badge: 'APP', desc: '/integration/process-review/structure', payload: { path: '/integration/process-review/structure' } },
+  { key: 'app-feasibility', label: '工艺方案可行性评估和优化APP', kind: 'app', group: '可制造性分析与优化软件', badge: 'APP', desc: '/integration/process-review/feasibility', payload: { path: '/integration/process-review/feasibility' } },
+
   // 二级：特种工艺决策与指令生成软件（/integration/capp/*）
   { key: 'app-special', label: '特种工艺决策与指令生成APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/special', payload: { path: '/integration/capp/special' } },
   { key: 'app-laying', label: '复材铺放工艺决策APP', kind: 'app', group: '特种工艺决策与指令生成软件', badge: 'APP', desc: '/integration/capp/laying', payload: { path: '/integration/capp/laying' } },
@@ -424,7 +517,54 @@ async function refreshToolPickerItems() {
 const modelOptions = ref<{ id: string; name: string }[]>([])
 const knowledgeOptions = ref<{ id: string; name: string }[]>([])
 
+/**
+ * 将后端/模板中的节点格式统一为页面使用的 WorkflowNode。
+ * 兼容：label/title、nodeType/type、position.{x,y}/x,y、group、appPath、inputs、outputs、configSchema、mockRuntime、config 等。
+ */
+function normalizeWorkflowNode(raw: Record<string, unknown>, index: number): WorkflowNode {
+  const id = (raw.id != null ? String(raw.id) : undefined) || `node-${index}`
+  const label = (raw.label ?? raw.title) != null ? String(raw.label ?? raw.title) : '未命名'
+  const nodeType = (raw.nodeType ?? raw.type) != null ? String(raw.nodeType ?? raw.type) : 'agent'
+  const pos = raw.position as { x?: number; y?: number } | undefined
+  const x = pos?.x ?? (raw.x != null ? Number(raw.x) : undefined) ?? 80 + index * 200
+  const y = pos?.y ?? (raw.y != null ? Number(raw.y) : undefined) ?? 160
+  const config = (raw.config as Record<string, unknown>) || {}
+  const node: WorkflowNode = {
+    id,
+    label,
+    nodeType,
+    modelId: (raw.modelId as string) ?? '',
+    modelName: raw.modelName as string | undefined,
+    knowledgeIds: Array.isArray(raw.knowledgeIds) ? raw.knowledgeIds.map(String) : [],
+    knowledgeNames: Array.isArray(raw.knowledgeNames) ? raw.knowledgeNames.map(String) : undefined,
+    desc: (raw.desc as string) ?? (raw.description as string) ?? '',
+    appPath: (raw.appPath as string) ?? (config.appPath as string) ?? undefined,
+    x,
+    y,
+    branch: raw.branch as WorkflowNode['branch'],
+  }
+  if (raw.group != null) node.group = String(raw.group)
+  if (Array.isArray(raw.inputs)) node.inputs = raw.inputs.map(String)
+  if (Array.isArray(raw.outputs)) node.outputs = raw.outputs.map(String)
+  if (Array.isArray(raw.configSchema)) node.configSchema = raw.configSchema as ConfigSchemaItem[]
+  if (raw.mockRuntime != null && typeof raw.mockRuntime === 'object') {
+    const mr = raw.mockRuntime as Record<string, unknown>
+    node.mockRuntime = {
+      status: mr.status != null ? String(mr.status) : undefined,
+      lastRunTime: mr.lastRunTime != null ? String(mr.lastRunTime) : null,
+      mockResult: mr.mockResult != null ? String(mr.mockResult) : undefined,
+    }
+  } else {
+    node.mockRuntime = { status: 'idle', lastRunTime: null, mockResult: '' }
+  }
+  if (raw.mockResultTemplate != null) node.mockResultTemplate = String(raw.mockResultTemplate)
+  if (Object.keys(config).length > 0) node.config = config
+  return node
+}
+
 async function loadAppAndWorkflow() {
+  workflowMeta.value = null
+  edges.value = []
   if (!appId.value) {
     appName.value = '未命名应用'
     appType.value = 'chatflow'
@@ -441,11 +581,40 @@ async function loadAppAndWorkflow() {
     const wf = app.workflowJson || ''
     if (wf) {
       try {
-        const parsed = JSON.parse(wf) as any
-        const loadedNodes = Array.isArray(parsed?.nodes) ? parsed.nodes : Array.isArray(parsed) ? parsed : null
-        if (loadedNodes) nodes.value = loadedNodes as WorkflowNode[]
+        const parsed = JSON.parse(wf) as Record<string, unknown>
+        // 兼容 { meta, nodes, edges } 与 仅 { nodes } 或 直接 nodes 数组
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.meta && typeof parsed.meta === 'object') {
+            const m = parsed.meta as Record<string, unknown>
+            workflowMeta.value = {
+              source: m.source as string | undefined,
+              templateKey: m.templateKey as string | undefined,
+              taskType: m.taskType as string | undefined,
+            }
+          }
+          if (Array.isArray(parsed.edges)) {
+            edges.value = parsed.edges
+              .filter((e: unknown) => e && typeof e === 'object' && 'source' in e && 'target' in e)
+              .map((e: Record<string, unknown>) => ({ source: String(e.source), target: String(e.target) }))
+          }
+          const rawNodes = Array.isArray(parsed.nodes) ? parsed.nodes : null
+          if (rawNodes && rawNodes.length > 0) {
+            nodes.value = rawNodes.map((n: unknown, i: number) =>
+              normalizeWorkflowNode((n && typeof n === 'object' ? n : {}) as Record<string, unknown>, i),
+            )
+          } else if (rawNodes && rawNodes.length === 0) {
+            nodes.value = []
+          }
+        } else if (Array.isArray(parsed)) {
+          const rawNodes = parsed as unknown[]
+          if (rawNodes.length > 0) {
+            nodes.value = rawNodes.map((n: unknown, i: number) =>
+              normalizeWorkflowNode((n && typeof n === 'object' ? n : {}) as Record<string, unknown>, i),
+            )
+          }
+        }
       } catch {
-        // ignore parse error
+        // 解析失败时保留当前节点，不报错
       }
     }
   } catch (e) {
@@ -463,7 +632,12 @@ let saveTimer: number | null = null
 async function saveWorkflowNow() {
   if (!appId.value) return
   try {
-    const workflowJson = JSON.stringify({ nodes: nodes.value })
+    const payload: { meta?: typeof workflowMeta.value; nodes: WorkflowNode[]; edges?: { source: string; target: string }[] } = {
+      nodes: nodes.value,
+    }
+    if (workflowMeta.value) payload.meta = workflowMeta.value
+    if (edges.value.length > 0) payload.edges = edges.value
+    const workflowJson = JSON.stringify(payload)
     await appApi.saveWorkflow(appId.value, { workflowJson })
     saveTime.value = nowTimeHHmmss()
   } catch {
@@ -680,8 +854,38 @@ function pickNode(item: PickerItem) {
 }
 
 function nodeMeta(n: WorkflowNode) {
-  if (n.nodeType === 'app') return n.appPath || 'APP'
+  if (n.nodeType === 'app') return n.appPath || n.group || 'APP'
+  if (n.nodeType === 'start') return '起始'
   return n.modelName || '未配置'
+}
+
+const mockRunningNodeId = ref<string | null>(null)
+
+function getNodeConfig(node: WorkflowNode, field: string): unknown {
+  if (!node.config || typeof node.config !== 'object') return undefined
+  return (node.config as Record<string, unknown>)[field]
+}
+
+function setNodeConfig(nodeId: string, field: string, value: unknown) {
+  const node = nodes.value.find(n => n.id === nodeId)
+  if (!node) return
+  if (!node.config) node.config = {}
+  ;(node.config as Record<string, unknown>)[field] = value
+  scheduleSaveWorkflow()
+}
+
+function runMockNode(node: WorkflowNode) {
+  if (!node.mockRuntime) node.mockRuntime = { status: 'idle', lastRunTime: null, mockResult: '' }
+  node.mockRuntime.status = 'running'
+  mockRunningNodeId.value = node.id
+  const delay = 500 + Math.random() * 700
+  setTimeout(() => {
+    node.mockRuntime!.status = 'success'
+    node.mockRuntime!.mockResult = node.mockResultTemplate || `节点【${node.label}】模拟运行完成，已输出示例结果。`
+    node.mockRuntime!.lastRunTime = new Date().toLocaleString()
+    mockRunningNodeId.value = null
+    scheduleSaveWorkflow()
+  }, delay)
 }
 
 function openAppPageNewTab(path?: string) {
@@ -816,6 +1020,14 @@ function startDrag(id: string, e: MouseEvent) {
 .header-center .auto-save {
   font-size: 12px;
   color: #6b7280;
+}
+.workflow-task-hint {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #0d9488;
+  background: #ccfbf1;
+  border-bottom: 1px solid #99f6e4;
 }
 .header-right {
   display: flex;
@@ -1220,6 +1432,17 @@ function startDrag(id: string, e: MouseEvent) {
   font-size: 12px;
   color: #6b7280;
   margin: 0;
+}
+.mock-result {
+  font-size: 12px;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+.config-schema-row {
+  margin-bottom: 8px;
   line-height: 1.5;
 }
 .workflow-footer {

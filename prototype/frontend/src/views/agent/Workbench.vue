@@ -65,7 +65,11 @@
             <el-icon :size="32"><MagicStick /></el-icon>
           </div>
           <div class="app-title">{{ app.name }}</div>
-          <div class="app-meta">{{ app.type?.toUpperCase?.() || 'APP' }} · 编辑于 {{ app.updateTime || '-' }}</div>
+          <div class="app-badges">
+            <el-tag size="small" :type="app.status === '已发布' ? 'success' : 'info'">{{ app.status || '草稿' }}</el-tag>
+            <el-tag size="small" type="primary" effect="plain">{{ typeLabel(app.type) }}</el-tag>
+          </div>
+          <div class="app-meta">编辑于 {{ app.updateTime || '-' }}</div>
           <div v-if="app.desc" class="app-desc">{{ app.desc }}</div>
           <div class="app-footer">
             <el-button link size="small" type="primary" @click.stop="addTag(app)">
@@ -150,7 +154,7 @@ const filteredApps = computed(() => {
 async function fetchApps() {
   loading.value = true
   try {
-    const res = await appApi.listApps({ status: '已发布' })
+    const res = await appApi.listApps()
     apps.value = res.data ?? []
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '加载应用失败')
@@ -178,6 +182,17 @@ function importDsl() {
 
 function openApp(app: appApi.AppItem) {
   router.push(`/agent-config/workflow?appId=${app.id}`)
+}
+
+function typeLabel(type: string) {
+  const map: Record<string, string> = {
+    workflow: '工作流',
+    chatflow: 'Chatflow',
+    agent: 'Agent',
+    chat: '聊天助手',
+    text: '文本生成',
+  }
+  return map[type] || type || '应用'
 }
 
 function addTag(app: appApi.AppItem) {
@@ -356,7 +371,16 @@ onMounted(() => {
   font-weight: 600;
   font-size: 15px;
   color: #111827;
+  margin-bottom: 8px;
+}
+.app-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 6px;
+}
+.app-badges .el-tag {
+  margin: 0;
 }
 .app-meta {
   font-size: 12px;

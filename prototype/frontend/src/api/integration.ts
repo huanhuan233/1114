@@ -10,6 +10,14 @@ export interface IntegrationTask {
   startTime: string
   endTime: string
   runTimeSeconds: number
+  /** 关联自动生成的工作流应用 ID，存在时可进入工作流页 */
+  appId?: number
+  /** 关联工作流应用名称 */
+  appName?: string
+  /** 推荐工作流模板标识 */
+  templateKey?: string
+  /** 创建任务时的初始工作流 JSON 快照 */
+  workflowJsonSnapshot?: string
 }
 
 export function listIntegrationTasks(params?: { system?: string; status?: string }) {

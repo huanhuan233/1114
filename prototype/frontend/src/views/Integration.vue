@@ -77,6 +77,11 @@
             <span class="workflow-text">{{ getWorkflowLabel(row.system) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="对应工作流" min-width="140">
+          <template #default="{ row }">
+            <span class="app-name-text">{{ row.appName || '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
@@ -97,8 +102,9 @@
           <template #default="{ row }">{{ row.runTimeSeconds ?? 0 }}</template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
+            <el-button v-if="row.appId" link type="primary" size="small" @click="goWorkflow(row)">进入工作流</el-button>
             <el-button link type="primary" size="small" @click="goDetail(row)">详情</el-button>
             <el-button link type="danger" size="small" @click="handleDeleteTask(row)">删除</el-button>
           </template>
@@ -192,11 +198,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Plus, UploadFilled, Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import type { IntegrationTask } from '@/api/integration'
 import * as integrationApi from '@/api/integration'
+
+const router = useRouter()
 
 const PART_WORKFLOWS: Record<string, string> = {
   '复材成型': '工艺审查 → CAPP → CAM → CAE',
@@ -235,8 +244,22 @@ function getWorkSteps(partType: string): { name: string; status?: string; progre
   return names.map((name) => ({ name, status: '待执行', progress: Math.floor(Math.random() * 101) }))
 }
 
-function goDetail(_row: IntegrationTask) {
-  ElMessage.info('进入任务详情（可后续对接详情页）')
+/** 进入工作流页面（仅当有 appId 时可用） */
+function goWorkflow(row: IntegrationTask) {
+  if (row.appId != null && row.appId !== '') {
+    router.push(`/agent-config/workflow?appId=${row.appId}`)
+  } else {
+    ElMessage.warning('该任务尚未生成工作流')
+  }
+}
+
+/** 详情：若有工作流则进入工作流页，否则提示 */
+function goDetail(row: IntegrationTask) {
+  if (row.appId != null && row.appId !== '') {
+    router.push(`/agent-config/workflow?appId=${row.appId}`)
+  } else {
+    ElMessage.warning('该任务尚未生成工作流')
+  }
 }
 
 async function handleDeleteTask(row: IntegrationTask) {
@@ -328,15 +351,18 @@ async function submitTask() {
   }
   submitting.value = true
   try {
-    await integrationApi.createIntegrationTask({
+    const res = await integrationApi.createIntegrationTask({
       name: dialogForm.name.trim(),
       system: dialogForm.partType,
       status: '排队中',
       progress: 0,
     })
-    ElMessage.success('总任务已创建')
+    ElMessage.success('任务已创建，并已自动生成对应工作流')
     dialogVisible.value = false
     fetchTasks()
+    if (res.data?.appId != null && res.data.appId !== '') {
+      router.push(`/agent-config/workflow?appId=${res.data.appId}`)
+    }
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '创建失败')
   } finally {
@@ -387,6 +413,10 @@ onMounted(() => fetchTasks())
   color: #606266;
 }
 .workflow-text {
+  font-size: 13px;
+  color: #606266;
+}
+.app-name-text {
   font-size: 13px;
   color: #606266;
 }
