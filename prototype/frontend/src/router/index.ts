@@ -17,7 +17,16 @@ const router = createRouter({
           redirect: '/integration',
           children: [
             { path: '', name: 'Integration', component: () => import('@/views/Integration.vue'), meta: { title: '工艺设计过程' } },
-            { path: 'process-review', name: 'ProcessReview', component: () => import('@/views/ProcessReview.vue'), meta: { title: '可制造性分析与优化软件' } },
+            {
+              path: 'process-review',
+              component: () => import('@/layouts/ProcessReviewLayout.vue'),
+              redirect: '/integration/process-review/feasibility',
+              meta: { title: '可制造性分析与优化软件' },
+              children: [
+                { path: 'structure', name: 'StructureAnalysisApp', component: () => import('@/views/integration/StructureAnalysisApp.vue'), meta: { title: '结构合理性分析APP' } },
+                { path: 'feasibility', name: 'FeasibilityOptimizationApp', component: () => import('@/views/integration/FeasibilityOptimizationApp.vue'), meta: { title: '工艺方案可行性评估和优化APP' } },
+              ],
+            },
             {
               path: 'capp',
               component: () => import('@/layouts/CAPPLayout.vue'),

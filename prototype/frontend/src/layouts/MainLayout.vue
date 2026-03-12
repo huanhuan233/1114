@@ -41,12 +41,20 @@
             <el-icon><List /></el-icon>
             <template #title>任务管理</template>
           </el-menu-item>
-          <el-menu-item index="/integration/process-review">
-            <el-icon><DocumentChecked /></el-icon>
+          <el-sub-menu index="process-review">
             <template #title>
+              <el-icon><DocumentChecked /></el-icon>
               <span class="title-ellipsis" title="可制造性分析与优化软件">可制造性分析与优化软件</span>
             </template>
-          </el-menu-item>
+            <el-menu-item index="/integration/process-review/structure">
+              <el-icon><Grid /></el-icon>
+              <template #title>结构合理性分析APP</template>
+            </el-menu-item>
+            <el-menu-item index="/integration/process-review/feasibility">
+              <el-icon><TrendCharts /></el-icon>
+              <template #title>工艺方案可行性评估和优化APP</template>
+            </el-menu-item>
+          </el-sub-menu>
           <el-sub-menu index="capp">
             <template #title>
               <el-icon><Document /></el-icon>
@@ -192,6 +200,7 @@ const defaultOpeneds = computed(() => {
   const opens: string[] = []
   if (route.path.startsWith('/knowledge')) opens.push('knowledge')
   if (route.path.startsWith('/integration')) opens.push('integration')
+  if (route.path.startsWith('/integration/process-review')) opens.push('process-review')
   if (route.path.startsWith('/integration/capp')) opens.push('capp')
   if (route.path.startsWith('/integration/cae')) opens.push('cae')
   if (route.path.startsWith('/agent-config')) opens.push('agent-config')

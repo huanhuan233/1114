@@ -20,14 +20,15 @@ else
   echo "后端已在运行，跳过"
 fi
 
-# 前端 (Vite, 端口 5355)
+# 前端 (Vite, 端口 5355)，--host 0.0.0.0 以便局域网访问
 if ! pgrep -f "node.*vite" >/dev/null 2>&1; then
-  ( cd frontend && nohup node node_modules/vite/bin/vite.js > ../logs/frontend.log 2>&1 & )
+  ( cd frontend && nohup node node_modules/vite/bin/vite.js --host 0.0.0.0 > ../logs/frontend.log 2>&1 & )
   echo "前端已后台启动，端口 5355，日志 logs/frontend.log"
 else
   echo "前端已在运行，跳过"
 fi
 
 echo ""
-echo "访问: http://192.168.0.97:5355/"
+echo "本机访问: http://127.0.0.1:5355/"
+echo "局域网访问: http://192.168.0.97:5355/  （需放行防火墙 5355、8055）"
 echo "查看日志: tail -f logs/backend.log  或  tail -f logs/frontend.log"
