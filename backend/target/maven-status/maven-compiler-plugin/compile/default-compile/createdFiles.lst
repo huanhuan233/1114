@@ -1,0 +1,6 @@
+com\processagent\entity\UserSession.class
+com\processagent\repository\UserSessionRepository.class
+com\processagent\service\TaskWorkflowTemplateFactory$1.class
+com\processagent\service\TaskNodeRegistry$NodeDef.class
+com\processagent\service\TaskNodeRegistry.class
+com\processagent\service\TaskWorkflowTemplateFactory.class

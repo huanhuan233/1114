@@ -1,0 +1,27 @@
+nohup: ignoring input
+
+  VITE v5.4.21  ready in 356 ms
+
+  ➜  Local:   http://localhost:5355/
+  ➜  Network: http://192.168.0.97:5355/
+  ➜  Network: http://172.17.0.1:5355/
+  ➜  Network: http://172.18.0.1:5355/
+  ➜  Network: http://172.19.0.1:5355/
+9:29:43 AM [vite] hmr update /src/views/Integration.vue
+9:29:44 AM [vite] hmr update /src/views/Integration.vue
+9:29:50 AM [vite] hmr update /src/views/Integration.vue
+9:29:50 AM [vite] hmr update /src/views/SystemManagement.vue
+9:29:52 AM [vite] hmr update /src/views/SystemManagement.vue
+9:29:56 AM [vite] hmr update /src/views/SystemManagement.vue
+9:29:58 AM [vite] hmr update /src/views/SystemManagement.vue
+9:30:01 AM [vite] hmr update /src/views/SystemManagement.vue
+9:30:02 AM [vite] hmr update /src/views/SystemManagement.vue
+9:30:07 AM [vite] hmr update /src/views/SystemManagement.vue
+9:30:08 AM [vite] hmr update /src/views/SystemManagement.vue?vue&type=style&index=0&scoped=cb5023e4&lang.css
+9:30:25 AM [vite] hmr update /src/views/Integration.vue
+9:33:33 AM [vite] hmr update /src/views/SystemManagement.vue
+9:33:36 AM [vite] hmr update /src/views/SystemManagement.vue
+9:33:37 AM [vite] hmr update /src/views/SystemManagement.vue, /src/views/SystemManagement.vue?vue&type=style&index=0&scoped=cb5023e4&lang.css
+9:33:40 AM [vite] hmr update /src/views/SystemManagement.vue
+9:33:41 AM [vite] hmr update /src/views/SystemManagement.vue?vue&type=style&index=0&scoped=cb5023e4&lang.css
+9:33:51 AM [vite] hmr update /src/views/SystemManagement.vue
