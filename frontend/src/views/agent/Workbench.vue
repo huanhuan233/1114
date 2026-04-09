@@ -20,7 +20,7 @@
       </div>
     </header>
 
-    <!-- 分类 Tab：全部、工作流、Chatflow、聊天助手、Agent、文本生成 -->
+    <!-- 分类 Tab：全部、任务流、子智能体、聊天助手、Agent、文本生成 -->
     <div class="category-tabs">
       <button
         v-for="cat in categories"
@@ -101,8 +101,8 @@
       </el-form-item>
       <el-form-item label="类型">
         <el-select v-model="createForm.type" style="width: 100%">
-          <el-option label="Chatflow" value="chatflow" />
-          <el-option label="工作流" value="workflow" />
+          <el-option label="子智能体" value="chatflow" />
+          <el-option label="任务流" value="workflow" />
           <el-option label="Agent" value="agent" />
           <el-option label="聊天助手" value="chat" />
           <el-option label="文本生成" value="text" />
@@ -131,8 +131,8 @@ const activeCategory = ref('all')
 
 const categories = [
   { label: '全部', value: 'all' },
-  { label: '工作流', value: 'workflow' },
-  { label: 'Chatflow', value: 'chatflow' },
+  { label: '任务流', value: 'workflow' },
+  { label: '子智能体', value: 'chatflow' },
   { label: '聊天助手', value: 'chat' },
   { label: 'Agent', value: 'agent' },
   { label: '文本生成', value: 'text' },
@@ -190,8 +190,8 @@ function openApp(app: appApi.AppItem) {
 
 function typeLabel(type: string) {
   const map: Record<string, string> = {
-    workflow: '工作流',
-    chatflow: 'Chatflow',
+    workflow: '任务流',
+    chatflow: '子智能体',
     agent: 'Agent',
     chat: '聊天助手',
     text: '文本生成',

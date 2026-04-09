@@ -64,11 +64,13 @@
               :style="nodePosition(node)"
               @mousedown="startDrag(node.id, $event)"
               @click.stop="selectNode(node.id)"
+              @dblclick.stop="handleNodeDblClick(node)"
             >
               <button class="node-handle left" type="button" title="连接" />
               <div class="node-icon">
                 <el-icon v-if="node.nodeType === 'start'"><Right /></el-icon>
                 <el-icon v-else-if="node.nodeType === 'end'"><CircleCheck /></el-icon>
+                <el-icon v-else-if="node.nodeType === 'subAgent'"><Collection /></el-icon>
                 <el-icon v-else-if="node.nodeType === 'app'"><Document /></el-icon>
                 <el-icon v-else><Cpu /></el-icon>
               </div>
@@ -105,6 +107,7 @@
             <button class="np-tab" :class="{ active: nodePickerTab === 'node' }" @click="nodePickerTab = 'node'">节点</button>
             <button class="np-tab" :class="{ active: nodePickerTab === 'tool' }" @click="nodePickerTab = 'tool'">工具</button>
             <button class="np-tab" :class="{ active: nodePickerTab === 'app' }" @click="nodePickerTab = 'app'">APP</button>
+            <button class="np-tab" :class="{ active: nodePickerTab === 'subAgent' }" @click="nodePickerTab = 'subAgent'">子智能体</button>
             <button class="np-close" title="关闭" @click="nodePickerVisible = false">×</button>
           </div>
           <div class="node-picker-search">
@@ -223,6 +226,21 @@
                   <p class="block-desc">状态：{{ selectedNode.mockRuntime?.status || 'idle' }}</p>
                   <p v-if="selectedNode.mockRuntime?.mockResult" class="mock-result">{{ selectedNode.mockRuntime.mockResult }}</p>
                   <el-button size="small" type="primary" :loading="mockRunningNodeId === selectedNode.id" style="margin-top: 8px" @click="selectedNode && runMockNode(selectedNode)">模拟运行</el-button>
+                </div>
+              </template>
+
+              <!-- 子智能体节点：引用已发布智能体，可跳转二次编辑 -->
+              <template v-else-if="selectedNode.nodeType === 'subAgent'">
+                <div class="config-block">
+                  <div class="block-label">子智能体</div>
+                  <p class="block-desc">该节点引用已发布智能体，点击画布节点或按钮可进入其工作流进行二次修改与发布。</p>
+                  <div class="block-label" style="margin-top: 12px">子智能体 ID</div>
+                  <el-input :model-value="selectedNode.subAgentAppId || ''" size="small" readonly />
+                  <div class="block-label" style="margin-top: 12px">类型</div>
+                  <el-input :model-value="formatAppTypeLabel(selectedNode.subAgentAppType)" size="small" readonly />
+                  <div style="margin-top: 12px">
+                    <el-button size="small" type="primary" @click="openSubAgentEditor(selectedNode.subAgentAppId)">进入子智能体</el-button>
+                  </div>
                 </div>
               </template>
 
@@ -348,8 +366,8 @@
       </el-form-item>
       <el-form-item label="类型">
         <el-select v-model="appInfoForm.type" style="width: 100%">
-          <el-option label="Chatflow" value="chatflow" />
-          <el-option label="工作流" value="workflow" />
+          <el-option label="子智能体" value="chatflow" />
+          <el-option label="任务流" value="workflow" />
           <el-option label="Agent" value="agent" />
           <el-option label="聊天助手" value="chat" />
           <el-option label="文本生成" value="text" />
@@ -398,6 +416,8 @@ interface WorkflowNode {
   knowledgeNames?: string[]
   desc: string
   appPath?: string
+  subAgentAppId?: string
+  subAgentAppType?: string
   x: number
   y: number
   branch?: {
@@ -441,7 +461,7 @@ const appInfoVisible = ref(false)
 const savingAppInfo = ref(false)
 const appInfoForm = ref({ name: '', desc: '', type: 'chatflow' })
 
-type PickerTab = 'node' | 'tool' | 'app'
+type PickerTab = 'node' | 'tool' | 'app' | 'subAgent'
 interface PickerItem {
   key: string
   label: string
@@ -449,7 +469,7 @@ interface PickerItem {
   group: string
   badge: string
   desc?: string
-  payload?: { path?: string }
+  payload?: { path?: string; appId?: string; appType?: string }
 }
 
 const defaultNodes: WorkflowNode[] = [
@@ -468,6 +488,8 @@ const nodePickerPos = ref({ x: 16, y: 16 })
 
 const nodePickerItems = ref<PickerItem[]>([
   // 节点
+  { key: 'start', label: '开始', kind: 'node', group: '基础', badge: 'S', desc: '工作流起始节点' },
+  { key: 'end', label: '结束', kind: 'node', group: '基础', badge: 'E', desc: '工作流结束节点' },
   { key: 'llm', label: 'LLM', kind: 'node', group: '基础', badge: 'LL', desc: '大模型对话与推理节点' },
   { key: 'direct', label: '直接回复', kind: 'node', group: '基础', badge: 'R', desc: '不经推理直接输出' },
   { key: 'agent', label: 'Agent', kind: 'node', group: '基础', badge: 'A', desc: '支持工具调用的 Agent 节点' },
@@ -500,6 +522,7 @@ const appPickerItems = ref<PickerItem[]>([
   { key: 'app-cae-process', label: '复材制造工艺过程仿真APP', kind: 'app', group: '复材成型工艺高精度仿真软件', badge: 'APP', desc: '/integration/cae/process', payload: { path: '/integration/cae/process' } },
   { key: 'app-cae-solver', label: '渗流求解器与多物理耦合器APP', kind: 'app', group: '复材成型工艺高精度仿真软件', badge: 'APP', desc: '/integration/cae/solver', payload: { path: '/integration/cae/solver' } },
 ])
+const subAgentPickerItems = ref<PickerItem[]>([])
 
 async function refreshToolPickerItems() {
   try {
@@ -519,6 +542,24 @@ async function refreshToolPickerItems() {
     })
   } catch {
     toolPickerItems.value = []
+  }
+}
+
+async function refreshSubAgentPickerItems() {
+  try {
+    const res = await appApi.listApps({ status: '已发布' })
+    const list = (res.data ?? []).filter(a => a.id !== appId.value)
+    subAgentPickerItems.value = list.map(a => ({
+      key: `sub-agent-${a.id}`,
+      label: a.name,
+      kind: 'subAgent',
+      group: '已发布智能体',
+      badge: 'SA',
+      desc: `${a.type || 'app'}${a.updateTime ? ` · ${a.updateTime}` : ''}`,
+      payload: { appId: a.id, appType: a.type },
+    }))
+  } catch {
+    subAgentPickerItems.value = []
   }
 }
 
@@ -547,6 +588,8 @@ function normalizeWorkflowNode(raw: Record<string, unknown>, index: number): Wor
     knowledgeNames: Array.isArray(raw.knowledgeNames) ? raw.knowledgeNames.map(String) : undefined,
     desc: (raw.desc as string) ?? (raw.description as string) ?? '',
     appPath: (raw.appPath as string) ?? (config.appPath as string) ?? undefined,
+    subAgentAppId: (raw.subAgentAppId as string) ?? (config.subAgentAppId as string) ?? undefined,
+    subAgentAppType: (raw.subAgentAppType as string) ?? (config.subAgentAppType as string) ?? undefined,
     x,
     y,
     branch: raw.branch as WorkflowNode['branch'],
@@ -750,6 +793,7 @@ watch(appId, () => {
 
 watch([nodePickerVisible, nodePickerTab], ([visible, tab]) => {
   if (visible && tab === 'tool') refreshToolPickerItems()
+  if (visible && tab === 'subAgent') refreshSubAgentPickerItems()
 })
 
 const selectedNodeId = ref<string | null>(nodes.value[0]?.id ?? null)
@@ -779,6 +823,12 @@ function edgePathByPos(a: WorkflowNode, b: WorkflowNode) {
 
 function selectNode(id: string) {
   selectedNodeId.value = id
+}
+
+function handleNodeDblClick(node: WorkflowNode) {
+  if (node.nodeType === 'subAgent' && node.subAgentAppId) {
+    openSubAgentEditor(node.subAgentAppId)
+  }
 }
 
 function removeNode(id: string) {
@@ -826,7 +876,11 @@ function openNodePicker(sourceId: string | null, e?: MouseEvent) {
 const filteredPickerGroups = computed(() => {
   const tab = nodePickerTab.value
   const kw = nodePickerSearch.value.trim().toLowerCase()
-  let list = tab === 'node' ? nodePickerItems.value : tab === 'tool' ? toolPickerItems.value : appPickerItems.value
+  let list: PickerItem[] = []
+  if (tab === 'node') list = nodePickerItems.value
+  if (tab === 'tool') list = toolPickerItems.value
+  if (tab === 'app') list = appPickerItems.value
+  if (tab === 'subAgent') list = subAgentPickerItems.value
   if (kw) list = list.filter(i => i.label.toLowerCase().includes(kw) || (i.desc && i.desc.toLowerCase().includes(kw)))
   const groups = new Map<string, PickerItem[]>()
   for (const it of list) {
@@ -848,7 +902,7 @@ function pickNode(item: PickerItem) {
   const newNode: WorkflowNode = {
     id,
     label: item.label,
-    nodeType: item.kind === 'node' ? item.key : item.kind === 'tool' ? 'tool' : 'app',
+    nodeType: item.kind === 'node' ? item.key : item.kind === 'tool' ? 'tool' : item.kind === 'app' ? 'app' : 'subAgent',
     modelId: '',
     knowledgeIds: [],
     desc: '',
@@ -857,6 +911,11 @@ function pickNode(item: PickerItem) {
   }
   if (newNode.nodeType === 'app') {
     newNode.appPath = item.payload?.path || ''
+  }
+  if (newNode.nodeType === 'subAgent') {
+    newNode.subAgentAppId = item.payload?.appId || ''
+    newNode.subAgentAppType = item.payload?.appType || ''
+    newNode.desc = '已发布子智能体'
   }
   if (newNode.nodeType === 'branch') {
     newNode.branch = { ifRules: [] }
@@ -875,9 +934,27 @@ function pickNode(item: PickerItem) {
 
 function nodeMeta(n: WorkflowNode) {
   if (n.nodeType === 'app') return n.appPath || n.group || 'APP'
+  if (n.nodeType === 'subAgent') return formatAppTypeLabel(n.subAgentAppType)
   if (n.nodeType === 'start') return '起始'
   if (n.nodeType === 'end') return '结束'
   return n.modelName || '未配置'
+}
+
+function formatAppTypeLabel(type?: string) {
+  const map: Record<string, string> = {
+    workflow: '任务流',
+    chatflow: '子智能体',
+    agent: 'Agent',
+    chat: '聊天助手',
+    text: '文本生成',
+  }
+  if (!type) return '子智能体'
+  return map[type] || type
+}
+
+function openSubAgentEditor(subAppId?: string) {
+  if (!subAppId) return
+  router.push(`/agent-config/workflow?appId=${subAppId}`)
 }
 
 const mockRunningNodeId = ref<string | null>(null)
